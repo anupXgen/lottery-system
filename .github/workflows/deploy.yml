@@ -1,0 +1,161 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Lint, audit, test
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-root
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-only-root"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    env:
+      LOTTERY_DB_HOST: 127.0.0.1
+      LOTTERY_DB_PORT: '3306'
+      LOTTERY_DB_USER: root
+      LOTTERY_DB_PASS: ci-only-root
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, mbstring, dom, xml, xmlreader, xmlwriter, simplexml, zip, gd, fileinfo, iconv, curl
+          tools: composer:v2
+          coverage: none
+
+      - name: No secrets committed
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)\.env(\..+)?$|\.pem$|\.key$|id_rsa|id_ed25519' | grep -v '\.env\.example$' || true)
+          if [ -n "$bad" ]; then echo "Secret-like files are tracked:"; echo "$bad"; exit 1; fi
+
+      - name: Composer validate + install
+        run: |
+          composer validate --no-check-publish
+          composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Dependency audit
+        run: composer audit --no-dev
+
+      - name: PHP lint
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Test suite (core + HTTP)
+        run: |
+          sudo apt-get install -y -qq poppler-utils > /dev/null
+          php tests/run-tests.php --http
+
+  deploy:
+    name: Deploy to production
+    needs: test
+    # Deploys stay off until the server and GitHub environment are ready:
+    # set repository variable PROD_DEPLOY_ENABLED=true to enable.
+    if: vars.PROD_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    environment: production
+    env:
+      DEPLOY_PATH: ${{ secrets.PROD_DEPLOY_PATH }}
+      PROD_HOST: ${{ secrets.PROD_HOST }}
+      PROD_PORT: ${{ secrets.PROD_PORT }}
+      PROD_USER: ${{ secrets.PROD_USER }}
+      DOMAIN: ${{ vars.PROD_DOMAIN }}
+      SCHEME: ${{ vars.PROD_SCHEME || 'http' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, dom, xml, xmlreader, xmlwriter, simplexml, zip, gd, fileinfo, iconv
+          tools: composer:v2
+          coverage: none
+
+      - name: Build
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Package release
+        run: |
+          RELEASE="$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::12}"
+          echo "RELEASE=$RELEASE" >> "$GITHUB_ENV"
+          echo "$GITHUB_SHA" > REVISION
+          tar -czf "/tmp/$RELEASE.tgz" \
+            --exclude=./.git --exclude=./.github --exclude=./tests \
+            --exclude=./uploads --exclude=./exports \
+            --exclude='./.env' --exclude='./.env.*' \
+            .
+          ls -lh "/tmp/$RELEASE.tgz"
+
+      - name: Configure SSH (pinned host key, no StrictHostKeyChecking=no)
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+          PROD_SSH_PASSPHRASE: ${{ secrets.PROD_SSH_PASSPHRASE }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$PROD_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/deploy_key
+          eval "$(ssh-agent -s)" > /dev/null
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+          if [ -n "$PROD_SSH_PASSPHRASE" ]; then
+            printf '#!/bin/sh\nprintf "%%s\\n" "$PROD_SSH_PASSPHRASE"\n' > ~/.ssh/askpass
+            chmod 700 ~/.ssh/askpass
+            SSH_ASKPASS=~/.ssh/askpass SSH_ASKPASS_REQUIRE=force DISPLAY=none ssh-add ~/.ssh/deploy_key < /dev/null
+            rm -f ~/.ssh/askpass
+          else
+            ssh-add ~/.ssh/deploy_key
+          fi
+          rm -f ~/.ssh/deploy_key
+          cat > ~/.ssh/config <<EOF
+          Host prod
+            HostName ${PROD_HOST}
+            Port ${PROD_PORT:-22}
+            User ${PROD_USER}
+            BatchMode yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ServerAliveInterval 15
+          EOF
+
+      - name: Upload release
+        run: scp -q "/tmp/$RELEASE.tgz" "prod:$DEPLOY_PATH/releases/$RELEASE.tgz"
+
+      - name: Activate release (health check, atomic switch, rollback on failure)
+        run: ssh prod "bash -s -- '$DEPLOY_PATH' '$RELEASE' '$DOMAIN' '$SCHEME' 5" < deploy/remote-deploy.sh
+
+      - name: Public HTTPS check
+        if: env.SCHEME == 'https'
+        run: |
+          curl -fsS --max-time 15 --retry 3 "https://$DOMAIN/api/live-status.php" | grep -q '"ok":true'
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://$DOMAIN/login.php")
+          [ "$code" = "301" ] || { echo "HTTP did not redirect to HTTPS ($code)"; exit 1; }
+          echo "Public HTTPS OK"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Deploy ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release: \`${RELEASE:-n/a}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`$GITHUB_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Target: \`$SCHEME://$DOMAIN\` → \`$DEPLOY_PATH/current\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up SSH agent
+        if: always()
+        run: ssh-agent -k > /dev/null 2>&1 || true

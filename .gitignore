@@ -1,0 +1,24 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Composer (built by CI; run `composer install --no-dev` for manual installs)
+/vendor/
+
+# Runtime data (shared/ on the server)
+/uploads/*
+!/uploads/index.php
+!/uploads/.htaccess
+/exports/*
+!/exports/index.php
+!/exports/.htaccess
+
+# Local / tooling
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
