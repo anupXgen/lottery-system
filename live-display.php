@@ -24,7 +24,7 @@ $diya = '<svg class="diya" viewBox="0 0 120 120" aria-hidden="true">'
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Diwali Lottery Draw – Live</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪔</text></svg>">
+    <link rel="icon" href="<?= e(url('assets/images/logo.jpg')) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Montserrat:wght@600;800;900&display=swap">
@@ -41,8 +41,11 @@ $diya = '<svg class="diya" viewBox="0 0 120 120" aria-hidden="true">'
         <!-- LEFT: active draw (70%) -->
         <section class="panel-left">
             <header class="event-head">
-                <div class="event-title">DIWALI LOTTERY DRAW</div>
-                <div class="event-sub" id="event-sub"></div>
+                <img class="org-logo" src="<?= e(url('assets/images/logo.jpg')) ?>" alt="Don Bosco Alumni Liluah">
+                <div class="event-head-text">
+                    <div class="event-title">DIWALI LOTTERY DRAW</div>
+                    <div class="event-sub" id="event-sub"></div>
+                </div>
             </header>
 
             <div class="prize-block">
@@ -100,6 +103,7 @@ $diya = '<svg class="diya" viewBox="0 0 120 120" aria-hidden="true">'
     window.LED = {
         statusUrl: <?= json_encode(url('api/live-status.php'), JSON_HEX_TAG | JSON_UNESCAPED_SLASHES) ?>,
         pollMs: <?= (int) LED_POLL_MS ?>,
+        revealMs: <?= (int) LED_REVEAL_MS ?>,
         totalPrizes: <?= (int) TOTAL_PRIZES ?>,
         initial: <?= json_encode($initial, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>
     };

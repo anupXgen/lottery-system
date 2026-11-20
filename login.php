@@ -33,7 +33,7 @@ $flashes = take_flashes();
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Login · <?= e(APP_NAME) ?></title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪔</text></svg>">
+    <link rel="icon" href="<?= e(url('assets/images/logo.jpg')) ?>">
     <link rel="stylesheet" href="<?= e(url('assets/vendor/bootstrap/css/bootstrap.min.css')) ?>">
     <link rel="stylesheet" href="<?= e(url('assets/vendor/bootstrap-icons/bootstrap-icons.min.css')) ?>">
     <link rel="stylesheet" href="<?= e(url('assets/css/style.css')) ?>">
@@ -43,7 +43,7 @@ $flashes = take_flashes();
     <div class="login-card card shadow-lg">
         <div class="card-body p-4 p-md-5">
             <div class="text-center mb-4">
-                <div class="login-diya">🪔</div>
+                <img class="login-logo" src="<?= e(url('assets/images/logo.jpg')) ?>" alt="Don Bosco Alumni Liluah" width="120" height="120">
                 <h1 class="h4 fw-bold mb-1">Diwali Lottery Draw</h1>
                 <p class="text-muted mb-0">Administrator Login</p>
             </div>

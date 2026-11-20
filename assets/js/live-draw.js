@@ -5,6 +5,7 @@
     var cfg = window.LOTTERY;
     var status = cfg.initial;
     var busy = false;
+    var autoRunning = false;   // one-click draw in progress on this page
     var pollTimer = null;
     var failures = 0;
 
@@ -24,8 +25,8 @@
 
     var STATE_TEXT = {
         IDLE: ['secondary', 'Ready'],
-        ROLLING: ['warning', 'Rolling…'],
-        REVEALED: ['info', 'Winner revealed – awaiting confirmation'],
+        ROLLING: ['warning', 'Drawing…'],
+        REVEALED: ['info', 'Winner revealed – not saved yet'],
         ENDED: ['dark', 'Lottery ended'],
         DONE: ['success', 'All prizes drawn']
     };
@@ -65,7 +66,9 @@
             els.number.classList.add('is-rolling');
             text(els.numberLabel, 'Rolling on LED screen…');
             text(els.meta, ' ');
-            text(els.message, 'Press REVEAL WINNER when the audience is ready.');
+            text(els.message, autoRunning
+                ? 'Drawing… the winner will be picked and saved automatically.'
+                : 'This draw was interrupted. Press DRAW WINNER NOW to pick and save the winner, or CANCEL DRAW.');
         } else if (s.state === 'REVEALED' && s.winner) {
             roller.halt(s.winner.lottery_number);
             els.number.classList.add('is-revealed');
@@ -96,9 +99,10 @@
         // Buttons for each state
         var canStart = s.state === 'IDLE' && !s.all_drawn && s.stats.tickets_available > 0;
         show(els.start, canStart);
-        show(els.reveal, s.state === 'ROLLING');
-        show(els.confirm, s.state === 'REVEALED');
-        show(els.cancel, s.state === 'ROLLING' || s.state === 'REVEALED');
+        // REVEAL / CONFIRM / CANCEL are only for recovering an interrupted one-click draw.
+        show(els.reveal, s.state === 'ROLLING' && !autoRunning);
+        show(els.confirm, s.state === 'REVEALED' && !autoRunning);
+        show(els.cancel, (s.state === 'ROLLING' || s.state === 'REVEALED') && !autoRunning);
         show(els.end, s.state === 'IDLE');
         show(els.resume, s.state === 'ENDED' && !s.all_drawn);
         show(els.report, s.all_drawn || s.state === 'ENDED');
@@ -138,6 +142,62 @@
                 row.appendChild(c);
             });
             els.winners.appendChild(row);
+        });
+    }
+
+    function handleFailure(res) {
+        if (res.sessionExpired) {
+            App.toast(res.error, 'danger');
+            setTimeout(function () { window.location.reload(); }, 1500);
+            return;
+        }
+        App.toast(res.error || 'Something went wrong.', 'danger');
+    }
+
+    /**
+     * One-click draw: START, let the LED roll for autoRollMs, then pick + save the winner.
+     * If anything fails half-way the state stays ROLLING/REVEALED and the recovery buttons appear.
+     */
+    function autoDraw() {
+        if (busy) {
+            return;
+        }
+        busy = true;
+        autoRunning = true;
+        render(status);
+        App.post(cfg.api + 'draw-start.php', {}).then(function (res) {
+            if (res.status && res.status.changed !== false) {
+                status = res.status;
+            }
+            if (!res.ok) {
+                busy = false;
+                autoRunning = false;
+                render(status);
+                handleFailure(res);
+                return;
+            }
+            render(status);
+            setTimeout(function () {
+                App.post(cfg.api + 'draw-finish.php', {}).then(function (res2) {
+                    autoRunning = false;
+                    if (res2.status && res2.status.changed !== false) {
+                        status = res2.status;
+                    }
+                    if (res2.ok && res2.result) {
+                        App.toast('Prize ' + res2.result.prize_number + ' won by ticket ' + res2.result.lottery_number + ' – saved.', 'success');
+                        // Keep START disabled while the LED screen slows down onto the winner.
+                        render(status);
+                        setTimeout(function () {
+                            busy = false;
+                            render(status);
+                        }, (cfg.revealMs || 2200) + 1200);
+                    } else {
+                        busy = false;
+                        render(status);
+                        handleFailure(res2);
+                    }
+                });
+            }, cfg.autoRollMs || 2000);
         });
     }
 
@@ -191,8 +251,9 @@
         }
     });
 
-    els.start.addEventListener('click', function () { act('draw-start.php'); });
-    els.reveal.addEventListener('click', function () { act('draw-reveal.php'); });
+    els.start.addEventListener('click', autoDraw);
+    // Recovery: finish an interrupted draw (pick + save in one step).
+    els.reveal.addEventListener('click', function () { act('draw-finish.php'); });
 
     els.confirm.addEventListener('click', function () {
         if (status.state !== 'REVEALED' || !status.winner || !status.current_prize) {

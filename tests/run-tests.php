@@ -205,6 +205,7 @@ section('3. Draw state machine & business rules');
 expect_draw_error(function () { draw_reveal(1); }, 'Cannot reveal before START');
 expect_draw_error(function () { draw_confirm(1, 1, 1); }, 'Cannot confirm before reveal');
 expect_draw_error(function () { draw_cancel(1); }, 'Cannot cancel when idle');
+expect_draw_error(function () { draw_reveal_and_confirm(1); }, 'One-click finish rejected before START');
 
 $r = draw_start(1);
 check($r['prize_number'] === 50, 'START draws Prize 50 first');
@@ -310,16 +311,24 @@ $err = '';
 for ($i = 0; $i < 48; $i++) {
     try {
         $st = draw_start(1);
-        $rv = draw_reveal(1);
-        $s = sess();
-        $cf = draw_confirm(1, (int) $s['prize_id'], (int) $s['lottery_ticket_id']);
+        if ($i % 2) {
+            // one-click draw: pick + save in one call
+            $cf = draw_reveal_and_confirm(1);
+            if (sess()['state'] !== 'IDLE' || $cf['lottery_number'] === '') {
+                throw new RuntimeException('one-click draw did not finish cleanly');
+            }
+        } else {
+            $rv = draw_reveal(1);
+            $s = sess();
+            $cf = draw_confirm(1, (int) $s['prize_id'], (int) $s['lottery_ticket_id']);
+        }
         $order[] = $cf['prize_number'];
     } catch (Throwable $e) {
         $err = $e->getMessage();
         break;
     }
 }
-check($order === range(48, 1), 'Prizes drawn strictly in descending order 48..1', $err ?: json_encode($order));
+check($order === range(48, 1), 'Prizes drawn strictly in descending order 48..1 (half via one-click reveal+confirm)', $err ?: json_encode($order));
 $stats = draw_stats();
 check($stats['prizes_drawn'] === 50 && $stats['winners_total'] === 50 && $stats['prizes_remaining'] === 0, 'All 50 prizes drawn, 50 winners');
 check($stats['tickets_won'] === 50 && $stats['tickets_available'] === 70, '50 tickets marked WON, 70 still eligible');

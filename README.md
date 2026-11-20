@@ -61,10 +61,8 @@ Ubuntu/Debian example: `apt install php8.3-fpm php8.3-mysql php8.3-mbstring php8
 3. **Settings** – event name, date and venue (shown on the LED screen and PDF).
 4. **LED screen** – on the computer connected to the LED wall open `/live-display.php` and press **F** (or the *Full screen* button). It needs no login and updates itself every second; refreshing it is always safe.
 5. **Live Draw** (`/admin/live-draw.php`) on the admin laptop:
-   - **START DRAW** → numbers start rolling on the LED screen.
-   - **REVEAL WINNER** → the server picks a random eligible ticket; the LED slows down and reveals it with a celebration.
-   - **CONFIRM WINNER** → confirmation dialog → saved permanently; the winner appears at the top of the LED winners list and the system moves to the next prize.
-   - **CANCEL DRAW** discards an unconfirmed draw (nothing is saved; the same prize is drawn again).
+   - **START DRAW** is the only click needed per prize: the LED rolls numbers for 2 seconds (`AUTO_ROLL_MS`), then the server picks a random eligible ticket and **saves it automatically**. The LED slows down onto the number (`LED_REVEAL_MS`), shows it as confirmed with a celebration, and adds it to the winners list. START unlocks again once the LED has landed.
+   - If the admin page is closed or loses connection mid-draw, the draw is left unfinished: **DRAW WINNER NOW** picks and saves it, **CONFIRM WINNER** saves an already revealed winner, **CANCEL DRAW** discards it (nothing saved; the same prize is drawn again).
    - **END LOTTERY** shows the closing screen on the LED (can be resumed if pressed early).
 6. **Reports** – download the PDF (*DIWALI LOTTERY – FINAL WINNERS LIST*, prizes 50 → 1, page numbers) or CSV. Before all 50 are drawn the PDF is marked *provisional*. A copy of each PDF is archived in `exports/`.
 

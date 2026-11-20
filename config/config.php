@@ -15,6 +15,13 @@ define('LED_WINNERS_LIMIT', 15);
 // LED display polling interval in milliseconds.
 define('LED_POLL_MS', 1000);
 
+// One-click draw: after START the numbers roll for this long, then the winner is
+// picked and saved automatically.
+define('AUTO_ROLL_MS', 2000);
+
+// How long the LED screen takes to slow down and land on the winning number.
+define('LED_REVEAL_MS', 2200);
+
 // Admin session idle timeout (seconds). The event can run for hours, so be generous.
 define('SESSION_IDLE_TIMEOUT', 6 * 3600);
 

@@ -27,6 +27,8 @@ if ($export === 'pdf') {
         flash('danger', 'PDF library (Dompdf) is not installed. Run "composer install" in the project folder.');
         redirect('admin/reports.php');
     }
+    $logoFile = APP_ROOT . '/assets/images/logo.jpg';
+    $logoSrc = is_file($logoFile) ? 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($logoFile)) : null;
     $title = $complete ? 'DIWALI LOTTERY – FINAL WINNERS LIST' : 'DIWALI LOTTERY – WINNERS LIST (PROVISIONAL)';
     ob_start();
     ?>
@@ -40,6 +42,8 @@ if ($export === 'pdf') {
     header { position: fixed; top: -19mm; left: 0; right: 0; height: 14mm; border-bottom: 2px solid #b8410b; }
     header .brand { font-size: 9pt; color: #b8410b; font-weight: bold; letter-spacing: 1px; }
     header .right { position: absolute; right: 0; top: 0; font-size: 8pt; color: #777; }
+    .logo { text-align: center; margin: 0 0 3mm; }
+    .logo img { width: 26mm; height: 26mm; }
     h1 { text-align: center; font-size: 17pt; color: #7a2a08; margin: 0 0 4mm; letter-spacing: 1px; }
     .sub { text-align: center; color: #555; margin-bottom: 5mm; }
     table.meta { width: 100%; border-collapse: collapse; margin-bottom: 6mm; }
@@ -65,6 +69,7 @@ if ($export === 'pdf') {
     <div class="brand"><?= e(mb_strtoupper($settings['event_name'])) ?></div>
     <div class="right">Generated <?= e(date('d M Y, h:i A')) ?></div>
 </header>
+<?php if ($logoSrc): ?><div class="logo"><img src="<?= $logoSrc ?>" alt=""></div><?php endif; ?>
 <h1><?= e($title) ?></h1>
 <div class="sub"><?= e($settings['event_name']) ?><?= $settings['event_venue'] ? ' · ' . e($settings['event_venue']) : '' ?></div>
 <table class="meta">

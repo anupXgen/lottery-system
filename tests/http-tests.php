@@ -144,8 +144,49 @@ $api = function ($ep, $data = []) use ($h, $token) {
 };
 $order = [];
 $problem = '';
+$j = $api('draw-finish.php');
+check($j['ok'] === false && $j['status']['state'] === 'IDLE', 'One-click finish API refused when no draw is running');
 for ($i = 0; $i < 50; $i++) {
     $a = $api('draw-start.php');
+    if ($i % 2) {
+        // One-click draw (what the START button does): draw-start, then draw-finish.
+        if ($i === 1) {
+            $mh = curl_multi_init();
+            $handles = [];
+            for ($k = 0; $k < 5; $k++) {
+                $ch = curl_init($GLOBALS['base'] . '/api/draw-finish.php');
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIEFILE => $GLOBALS['cookieJar'], CURLOPT_HTTPHEADER => $h,
+                    CURLOPT_POSTFIELDS => ['csrf_token' => $token],
+                ]);
+                curl_multi_add_handle($mh, $ch);
+                $handles[] = $ch;
+            }
+            do {
+                curl_multi_exec($mh, $running);
+                curl_multi_select($mh);
+            } while ($running);
+            $wins = [];
+            foreach ($handles as $ch) {
+                $jj = json_decode(curl_multi_getcontent($ch), true);
+                if (!empty($jj['ok'])) {
+                    $wins[] = $jj['result']['prize_number'];
+                }
+                curl_multi_remove_handle($mh, $ch);
+            }
+            curl_multi_close($mh);
+            check(count($wins) === 1, '5 simultaneous one-click FINISH requests -> exactly 1 winner saved');
+            $order[] = $wins ? $wins[0] : null;
+            continue;
+        }
+        $f = $api('draw-finish.php');
+        if (!$a['ok'] || !$f['ok'] || $f['status']['state'] !== 'IDLE') {
+            $problem = json_encode([$a, $f]);
+            break;
+        }
+        $order[] = $f['result']['prize_number'];
+        continue;
+    }
     $b = $api('draw-reveal.php');
     if (!$a['ok'] || !$b['ok']) {
         $problem = json_encode([$a, $b]);
@@ -187,7 +228,7 @@ for ($i = 0; $i < 50; $i++) {
     }
     $order[] = $c['result']['prize_number'];
 }
-check($order === range(50, 1), 'All 50 draws via HTTP API in order 50 -> 1', $problem);
+check($order === range(50, 1), 'All 50 draws via HTTP API in order 50 -> 1 (half one-click)', $problem);
 $j = $api('draw-start.php');
 check($j['ok'] === false && strpos($j['error'], 'All prizes') !== false, 'API refuses START after all prizes drawn');
 $j = $api('draw-end.php', ['action' => 'end']);

@@ -166,8 +166,26 @@ function draw_reveal(int $userId): array
             'eligible_tickets' => $count,
         ], $userId);
 
-        return ['prize_number' => (int) $prize['prize_number'], 'lottery_number' => $number];
+        return [
+            'prize_id'       => (int) $prize['id'],
+            'ticket_id'      => $ticketId,
+            'prize_number'   => (int) $prize['prize_number'],
+            'lottery_number' => $number,
+        ];
     });
+}
+
+/**
+ * One-click draw, second half: REVEAL + CONFIRM back to back (used after START has
+ * rolled for AUTO_ROLL_MS). The winner is picked exactly as in draw_reveal() and saved
+ * through draw_confirm(), so all the same checks and UNIQUE constraints apply. If the
+ * confirm step fails, the draw stays REVEALED and can be confirmed or cancelled manually.
+ */
+function draw_reveal_and_confirm(int $userId): array
+{
+    $revealed = draw_reveal($userId);
+    $saved = draw_confirm($userId, $revealed['prize_id'], $revealed['ticket_id']);
+    return $saved + ['lottery_number' => $revealed['lottery_number']];
 }
 
 /**

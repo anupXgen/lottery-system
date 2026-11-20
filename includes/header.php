@@ -21,7 +21,7 @@ $navItems = [
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <title><?= e($pageTitle) ?> · <?= e(APP_NAME) ?></title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪔</text></svg>">
+    <link rel="icon" href="<?= e(url('assets/images/logo.jpg')) ?>">
     <link rel="stylesheet" href="<?= e(url('assets/vendor/bootstrap/css/bootstrap.min.css')) ?>">
     <link rel="stylesheet" href="<?= e(url('assets/vendor/bootstrap-icons/bootstrap-icons.min.css')) ?>">
     <link rel="stylesheet" href="<?= e(url('assets/css/style.css')) ?>">
@@ -30,7 +30,7 @@ $navItems = [
 <nav class="navbar navbar-expand-lg navbar-dark admin-nav sticky-top">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="<?= e(url('admin/dashboard.php')) ?>">
-            <span class="brand-diya">🪔</span> Diwali Lottery
+            <img class="brand-logo" src="<?= e(url('assets/images/logo.jpg')) ?>" alt="" width="34" height="34"> Diwali Lottery
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>

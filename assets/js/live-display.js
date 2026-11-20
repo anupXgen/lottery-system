@@ -19,6 +19,7 @@
     var cur = null;            // last applied status
     var phase = null;          // what is on screen
     var revealTicket = null;   // ticket id currently being revealed / shown
+    var revealNumber = null;   // lottery number the roller is slowing down onto
     var seenDraws = null;      // draw ids already rendered in the winners list
     var version = null;
     var failures = 0;
@@ -143,12 +144,15 @@
         if (phase !== 'rolling') {
             phase = 'rolling';
             revealTicket = null;
+            revealNumber = null;
             setStageClass('rolling');
             fx.clear();
+            roller.halt();   // drop any unfinished slow-down from a previous reveal
             roller.start();
         }
     }
 
+    /** Manual flow: the server is in REVEALED (winner picked, not saved yet). */
     function showReveal(s, quick) {
         var w = s.winner;
         setPrize('PRIZE NO.', s.current_prize);
@@ -156,6 +160,7 @@
             return; // already revealing/revealed this ticket
         }
         revealTicket = w.ticket_id;
+        revealNumber = w.lottery_number;
         phase = 'revealing';
         setStageClass('rolling');
         text(els.caption, 'DRAWING…');
@@ -163,7 +168,7 @@
         setMeta('', '');
         roller.setPool(s.roll_pool);
         roller.start();
-        roller.stopAt(w.lottery_number, quick ? 1400 : 3400).then(function (finished) {
+        roller.stopAt(w.lottery_number, quick ? 1400 : cfg.revealMs).then(function (finished) {
             if (!finished || phase !== 'revealing' || revealTicket !== w.ticket_id) {
                 return;
             }
@@ -175,10 +180,44 @@
             text(els.ribbon, 'CONGRATULATIONS!  ·  PRIZE NO. ' + s.current_prize.number + '  ·  ' + s.current_prize.name);
             pop();
             celebrate(true);
+            // Confirmed while we were slowing down: switch to the confirmed view after the celebration.
+            if (cur.state === 'IDLE' && cur.last_winner && cur.last_winner.lottery_number === w.lottery_number) {
+                setTimeout(function () {
+                    if (phase === 'revealed' && revealTicket === w.ticket_id) {
+                        apply(cur, false);
+                    }
+                }, 1600);
+            }
         });
     }
 
-    function apply(s, isInitial) {
+    /**
+     * One-click flow: the winner arrives already saved (the REVEALED step is too short for
+     * the LED to see). Slow the rolling numbers down onto it, then show it as confirmed.
+     * The winners list is only updated once the number has landed, so it never spoils it.
+     */
+    function revealConfirmed(s) {
+        var w = s.last_winner;
+        phase = 'revealing';
+        revealTicket = 'draw-' + w.draw_id;
+        revealNumber = w.lottery_number;
+        setStageClass('rolling');
+        setPrize('PRIZE NO.', { number: w.prize_number, name: w.prize_name });
+        text(els.caption, 'DRAWING…');
+        text(els.ribbon, '✦  AND THE WINNER IS…  ✦');
+        setMeta('', '');
+        fx.clear();
+        roller.start();
+        roller.stopAt(w.lottery_number, cfg.revealMs).then(function (finished) {
+            if (!finished || phase !== 'revealing' || revealNumber !== w.lottery_number) {
+                return;
+            }
+            phase = null;
+            apply(cur, false, true);
+        });
+    }
+
+    function apply(s, isInitial, landed) {
         var prev = cur;
         cur = s;
         version = s.version;
@@ -187,8 +226,27 @@
         text(els.sub, [ev.name && ev.name.toUpperCase() !== 'DIWALI LOTTERY DRAW' ? ev.name : '', ev.date, ev.venue]
             .filter(Boolean).join('  ·  '));
 
+        // A reveal is still slowing down onto this (now saved) winner: let it land first.
+        if (phase === 'revealing' && s.state === 'IDLE' && s.last_winner && s.last_winner.lottery_number === revealNumber) {
+            return;
+        }
+
         var newConfirm = !isInitial && prev && s.last_draw_id && s.last_draw_id !== prev.last_draw_id;
+
+        // One-click draw finished (we saw rolling or nothing, but never the reveal): animate it.
+        if (newConfirm && s.state === 'IDLE' && s.last_winner && phase !== 'revealed') {
+            revealConfirmed(s);
+            return;
+        }
+
         renderWinners(s, !isInitial);
+
+        if (landed && s.state === 'IDLE' && s.last_winner) {
+            showLastWinner(s, false);
+            pop();
+            celebrate(true);
+            return;
+        }
 
         if (s.state === 'ENDED') {
             roller.halt();

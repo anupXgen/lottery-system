@@ -13,6 +13,8 @@ require APP_ROOT . '/includes/header.php';
         api: <?= json_encode(url('api/'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>,
         reportsUrl: <?= json_encode(url('admin/reports.php'), JSON_HEX_TAG | JSON_UNESCAPED_SLASHES) ?>,
         displayUrl: <?= json_encode(url('live-display.php'), JSON_HEX_TAG | JSON_UNESCAPED_SLASHES) ?>,
+        autoRollMs: <?= (int) AUTO_ROLL_MS ?>,
+        revealMs: <?= (int) LED_REVEAL_MS ?>,
         initial: <?= json_encode($initial, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>
     };
 </script>
@@ -47,7 +49,7 @@ require APP_ROOT . '/includes/header.php';
             </div>
             <div class="card-footer control-buttons">
                 <button type="button" class="btn btn-lg btn-success" id="btn-start"><i class="bi bi-play-circle-fill"></i> START DRAW</button>
-                <button type="button" class="btn btn-lg btn-warning" id="btn-reveal"><i class="bi bi-stars"></i> REVEAL WINNER</button>
+                <button type="button" class="btn btn-lg btn-warning" id="btn-reveal"><i class="bi bi-stars"></i> DRAW WINNER NOW</button>
                 <button type="button" class="btn btn-lg btn-primary" id="btn-confirm"><i class="bi bi-check2-circle"></i> CONFIRM WINNER</button>
                 <button type="button" class="btn btn-lg btn-outline-danger" id="btn-cancel"><i class="bi bi-x-circle"></i> CANCEL DRAW</button>
                 <button type="button" class="btn btn-lg btn-outline-success" id="btn-resume"><i class="bi bi-arrow-counterclockwise"></i> RESUME LOTTERY</button>
@@ -62,10 +64,10 @@ require APP_ROOT . '/includes/header.php';
             <div class="card-header fw-semibold"><i class="bi bi-info-circle"></i> How to run each draw</div>
             <div class="card-body small">
                 <ol class="mb-0">
-                    <li><strong>START DRAW</strong> starts the rolling animation on the LED screen for the next prize.</li>
-                    <li><strong>REVEAL WINNER</strong> makes the server pick a random eligible ticket. The LED screen slows down and reveals it.</li>
-                    <li>Check the ticket, then press <strong>CONFIRM WINNER</strong> and confirm. Only then is it saved permanently.</li>
-                    <li>The system automatically moves to the next prize (<?= TOTAL_PRIZES ?> → 1). Use <strong>CANCEL DRAW</strong> to discard an unconfirmed draw.</li>
+                    <li>Press <strong>START DRAW</strong>. The LED screen rolls numbers for <?= round(AUTO_ROLL_MS / 1000, 1) ?> seconds.</li>
+                    <li>The server then picks a random eligible ticket and <strong>saves it automatically</strong>. The LED screen slows down and shows the winner.</li>
+                    <li>The system moves to the next prize (<?= TOTAL_PRIZES ?> → 1). Press <strong>START DRAW</strong> again for the next one.</li>
+                    <li>If this page is closed or loses connection in the middle of a draw, use <strong>DRAW WINNER NOW</strong> / <strong>CONFIRM WINNER</strong> to finish it, or <strong>CANCEL DRAW</strong> to discard it.</li>
                 </ol>
             </div>
         </div>
