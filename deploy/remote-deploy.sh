@@ -108,6 +108,18 @@ http_check() {
 }
 
 if [ -e "/etc/nginx/sites-enabled/$DOMAIN" ]; then
+    # Once SSL is set up nginx redirects http -> https. If PROD_SCHEME is still "http",
+    # follow that and check over https instead of failing on the 301.
+    if [ "$SCHEME" = "http" ]; then
+        probe="$(curl -sS --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' \
+                 --resolve "$DOMAIN:80:127.0.0.1" "http://$DOMAIN/login.php" || true)"
+        case "$probe" in
+            30[1278]\ https://"$DOMAIN"/*)
+                echo "   note: nginx redirects http -> https; checking over https (set PROD_SCHEME=https in GitHub)"
+                SCHEME=https
+                ;;
+        esac
+    fi
     log "Post-switch HTTP health check ($SCHEME via nginx on 127.0.0.1)"
     if ! http_check; then
         if [ -n "$PREV" ] && [ -d "$PREV" ] && [ "$PREV" != "$REL" ]; then
