@@ -96,7 +96,8 @@ http_check() {
         echo "   [FAIL] /login.php -> $code (or PHP source exposed)"; fails=$((fails + 1))
     fi
 
-    for p in .env config/database.php composer.json database.sql bin/healthcheck.php vendor/autoload.php; do
+    for p in .env config/database.php composer.json database.sql bin/healthcheck.php vendor/autoload.php \
+             database/migrations/add_housie_module.sql includes/housie/housie.php; do
         code="$("${CURL[@]}" -o /dev/null -w '%{http_code}' "$base/$p" || echo 000)"
         if [ "$code" = "404" ] || [ "$code" = "403" ]; then
             echo "   [ OK ] /$p -> $code"

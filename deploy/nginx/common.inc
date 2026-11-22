@@ -23,7 +23,7 @@ location ^~ /.well-known/acme-challenge/ {
 }
 
 # ---- Private: never served (nginx ignores .htaccess, so these are REQUIRED) ----
-location ~ ^/(config|includes|vendor|uploads|exports|tests|deploy|bin)(/|$) {
+location ~ ^/(config|includes|vendor|uploads|exports|tests|deploy|bin|database)(/|$) {
     return 404;
 }
 location ~ /\. {                                  # .env, .htaccess, .user.ini, .git, .github

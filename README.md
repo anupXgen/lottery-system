@@ -116,3 +116,32 @@ The PDF text checks use `pdftotext` (poppler-utils) when available. Run tests on
 - Confirmed winners cannot be edited from the draw screen by design; correcting one requires a full reset.
 - Lottery numbers are stored as text (leading zeros are kept for CSV files; Excel may already have removed them if the column was numeric).
 - The LED page loads the Cinzel/Montserrat fonts from Google Fonts; without internet it falls back to system fonts (everything else is local).
+
+## 8. Housie / Tambola module
+
+An independent second module, reached from the **Housie / Tambola** menu. It uses the same admin login, and shares no tables, draw logic, screens or reports with the lottery.
+
+**Install (once, additive):** take a backup, then apply the migration to the existing database:
+
+```bash
+mysqldump diwali_lottery > backup-before-housie.sql
+sudo mysql diwali_lottery < database/migrations/add_housie_module.sql
+```
+
+It only creates `housie_*` tables (`CREATE TABLE IF NOT EXISTS`, safe to re-run) and never touches lottery tables. Until it is applied, the Housie pages show an "not installed" notice and the lottery works as before.
+
+| Page | Purpose |
+|---|---|
+| `housie/index.php` | Dashboard: create a game, switch the active game, checklist |
+| `housie/tickets.php` | Generate tickets in bulk (valid 3×9, 15 numbers, unique), search by Ticket ID / name, assign participants (before the game starts), print or PDF (10 per A4 page) |
+| `housie/prizes.php` | Enable categories, prize names, descriptions, winners allowed, order; status Pending / Claimed / Completed |
+| `housie/live-draw.php` | START, CALL NEXT NUMBER, PAUSE, RESUME, END |
+| `housie/claims.php` | Verify a claim (category + Ticket ID) against the numbers called, then confirm or reject |
+| `housie/reports.php` | Winners, number calling history, ticket report; PDF, CSV, print |
+| `housie/live-display.php` | **Housie LED screen** (public, 1920×1080, press F) |
+
+How it stays fair: the 1–90 order is shuffled on the server at START (Fisher-Yates with `random_int`) and never sent to browsers; each call runs in a transaction that locks the game row, and `UNIQUE(game_id, number)` makes repeats impossible. Claims are never auto-confirmed: the admin checks, then confirms, and confirmation re-checks everything with the game and prize rows locked. Duplicate confirmations, exceeding the winners allowed, claims from another game and claims on uncalled numbers are all refused. Second / Third Full House require the previous Full House to be completed, and a ticket can win only one Full House. Generated tickets always have numbers in the four corner cells, so every ticket can win Four Corners.
+
+Tests: `php tests/run-tests.php` now also runs the Housie suite (sections H1–H8, plus H9 with `--http`).
+
+**Physical (pre-printed) tickets:** generating tickets in the system is optional. A game can be started with no system tickets; call numbers as usual, check claimed tickets by hand in the room (the Claim Verification page shows the 1–90 board of called numbers), then use **Manual winner entry** (category, ticket number as printed, winner name). The winner appears on the Housie LED screen and in the reports immediately. Winner limits, duplicate tickets per category and the Full House order rules are still enforced; the ticket's numbers are not checked by the system in this mode.

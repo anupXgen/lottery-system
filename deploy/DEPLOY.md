@@ -115,6 +115,18 @@ SQL
 > ⚠️ `database.sql` drops and recreates all tables. **Run it once only** – never on a live event database.
 > Generate the password with `openssl rand -base64 24` and type it straight into the next step; don't paste it into chat/tickets.
 
+### 5a. Housie / Tambola module tables (once)
+
+Additive migration - creates only `housie_*` tables and never changes lottery data. Back up first:
+
+```bash
+sudo mysqldump diwali_lottery > ~/backup-before-housie-$(date +%F).sql
+scp database/migrations/add_housie_module.sql mumadmin@$SERVER_IP:/tmp/   # from the PC
+sudo mysql diwali_lottery < /tmp/add_housie_module.sql && rm /tmp/add_housie_module.sql
+```
+
+The `lottery` DB user already has SELECT/INSERT/UPDATE/DELETE on `diwali_lottery.*`, which covers the new tables. `bin/healthcheck.php` reports whether the Housie tables exist (informational; it never blocks a deploy). Housie LED screen: `https://lottery.myappstore.org.in/housie/live-display.php`.
+
 ## 6. Production `.env` (server)
 
 ```bash

@@ -269,6 +269,9 @@ check(strpos($r['headers'], 'text/csv') !== false && count($lines) === 51 && str
 $r = http('GET', '/admin/prizes.php');
 check(strpos($r['body'], 'locked') !== false, 'Prizes page shows locked notice after draws');
 
+// Housie / Tambola module over HTTP (still logged in)
+require __DIR__ . '/housie-http-tests.php';
+
 // Logout
 $r = http('POST', '/logout.php', ['post' => ['csrf_token' => $token]]);
 $r = http('GET', '/admin/dashboard.php');

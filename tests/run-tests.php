@@ -68,6 +68,14 @@ function recreate_test_db(string $testDb): void
             $pdo->exec($stmt);
         }
     }
+    // Housie module: apply its additive migration on top of the lottery schema.
+    $pdo->exec("USE `$testDb`");
+    $migration = preg_replace('/^\s*--.*$/m', '', (string) file_get_contents(APP_ROOT . '/database/migrations/add_housie_module.sql'));
+    foreach (preg_split('/;\s*\n/', $migration) as $stmt) {
+        if (trim($stmt) !== '') {
+            $pdo->exec($stmt);
+        }
+    }
 }
 
 function make_csv(array $rows): string
@@ -406,6 +414,9 @@ for ($i = 0; $i < 2; $i++) {
 }
 expect_draw_error(function () { draw_start(1); }, 'START rejected when no eligible tickets remain');
 lottery_reset(1, true);
+
+/* ====================================================================== */
+require __DIR__ . '/housie-tests.php';
 
 /* ====================================================================== */
 if ($withHttp) {

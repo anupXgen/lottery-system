@@ -40,6 +40,10 @@ try {
     }
     hc((int) $pdo->query('SELECT COUNT(*) FROM prizes')->fetchColumn() === TOTAL_PRIZES, TOTAL_PRIZES . ' prizes configured');
     hc((bool) $pdo->query('SELECT 1 FROM draw_session WHERE id = 1')->fetchColumn(), 'draw_session row present');
+    // Housie module (informational only - never fails the lottery deploy)
+    $housie = (bool) $pdo->query("SHOW TABLES LIKE 'housie_game_settings'")->fetchColumn();
+    echo $housie ? "[ OK ] Housie module tables installed\n"
+                 : "[WARN] Housie module tables not installed - run database/migrations/add_housie_module.sql\n";
 } catch (Throwable $e) {
     hc(false, 'database: ' . $e->getMessage());
 }
