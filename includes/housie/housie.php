@@ -197,8 +197,7 @@ function housie_prizes(int $gameId, bool $enabledOnly = false): array
 
     // LEFT JOIN: manual (physical ticket) winners have no system ticket row.
     $w = db()->prepare("SELECT c.id AS claim_id, c.prize_id, c.winner_rank, c.created_at, c.calls_at_claim, c.last_number,
-                               c.ticket_ref, t.ticket_no, COALESCE(c.participant_name, t.participant_name) AS participant_name,
-                               (c.ticket_id IS NULL) AS manual
+                               c.ticket_ref, t.ticket_no, COALESCE(c.participant_name, t.participant_name) AS participant_name
                           FROM housie_claims c LEFT JOIN housie_tickets t ON t.id = c.ticket_id
                          WHERE c.game_id = ? AND c.status = 'CONFIRMED'
                          ORDER BY c.winner_rank");
