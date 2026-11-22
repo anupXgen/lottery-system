@@ -411,3 +411,24 @@ expect_housie_error(function () use ($pTopx) { housie_record_manual_winner(1, $G
 housie_end_game(1);
 expect_housie_error(function () use ($g3, $pTopx) { housie_record_manual_winner(1, $g3, $pTopx, 'F-3', ''); }, 'Manual entry after END rejected', 'ended');
 check(lottery_fingerprint() === $lotteryBefore, 'Lottery tables still unchanged after manual-entry tests');
+
+/* ====================================================================== */
+section('H11. Automatic migration runner (bin/migrate.php, used by deploys)');
+$runMigrate = function (string $arg = '') {
+    $env = getenv();
+    $env['LOTTERY_DB_NAME'] = $GLOBALS['testDb'];
+    $p = proc_open('"' . PHP_BINARY . '" "' . APP_ROOT . '/bin/migrate.php"' . ($arg ? ' ' . $arg : ''), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, APP_ROOT, $env, ['bypass_shell' => true]);
+    $out = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    return [proc_close($p), $out];
+};
+list($code, $out) = $runMigrate();
+check($code === 0 && strpos($out, 'add_housie_module.sql') !== false, 'Migration runner succeeds on a database that already has the Housie tables (idempotent)', trim($out));
+$rec = db()->query("SELECT COUNT(*) FROM schema_migrations WHERE name = 'add_housie_module.sql'")->fetchColumn();
+check((int) $rec === 1, 'Applied migration recorded in schema_migrations');
+list($code, $out) = $runMigrate();
+check($code === 0 && strpos($out, 'No pending migrations') !== false, 'Second run: nothing pending');
+list($code, $out) = $runMigrate('--status');
+check($code === 0 && strpos($out, '[ OK ] add_housie_module.sql') !== false, '--status lists applied migrations');
+check(lottery_fingerprint() === $lotteryBefore, 'Lottery tables unchanged by the migration runner');

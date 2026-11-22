@@ -121,7 +121,7 @@ The PDF text checks use `pdftotext` (poppler-utils) when available. Run tests on
 
 An independent second module, reached from the **Housie / Tambola** menu. It uses the same admin login, and shares no tables, draw logic, screens or reports with the lottery.
 
-**Install (once, additive):** take a backup, then apply the migration to the existing database:
+**Install:** the migration runs automatically on every deploy (`bin/migrate.php`, see `deploy/DEPLOY.md` step 5a - works with AWS RDS). To apply it by hand instead, take a backup, then:
 
 ```bash
 mysqldump diwali_lottery > backup-before-housie.sql

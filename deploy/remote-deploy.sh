@@ -55,6 +55,17 @@ log "Setting permissions (dirs 755, files 644)"
 find "$REL" -type d -exec chmod 755 {} +
 find "$REL" -type f -exec chmod 644 {} +
 
+# Additive, idempotent migrations (database/migrations/*.sql) run against the app's database
+# (local MySQL or RDS) BEFORE the switch, so the new code never runs without its tables.
+# The current release keeps serving meanwhile; it simply ignores tables it does not know.
+if [ -f "$REL/bin/migrate.php" ]; then
+    log "Database migrations"
+    if ! php "$REL/bin/migrate.php"; then
+        rm -rf -- "${REL:?}"
+        fail "database migration failed - live site untouched (see message above)"
+    fi
+fi
+
 log "Pre-switch health check (PHP CLI against the new release)"
 if ! php "$REL/bin/healthcheck.php"; then
     rm -rf -- "${REL:?}"

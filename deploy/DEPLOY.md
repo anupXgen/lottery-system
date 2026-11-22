@@ -115,17 +115,35 @@ SQL
 > ⚠️ `database.sql` drops and recreates all tables. **Run it once only** – never on a live event database.
 > Generate the password with `openssl rand -base64 24` and type it straight into the next step; don't paste it into chat/tickets.
 
-### 5a. Housie / Tambola module tables (once)
+### 5a. Database migrations (automatic on every deploy)
 
-Additive migration - creates only `housie_*` tables and never changes lottery data. Back up first:
+Schema changes live in `database/migrations/*.sql` (additive and idempotent, e.g. the Housie module tables). Every deploy runs `php bin/migrate.php` **on the server, before the new release goes live**, against the database in `shared/.env` (local MySQL or **AWS RDS**). Applied migrations are recorded in `schema_migrations`; if a migration fails the deploy stops and the live site is untouched.
+
+Creating tables needs more rights than the app user (data-only). On RDS, create a separate migration user once, as the RDS master user, from the server:
 
 ```bash
-sudo mysqldump diwali_lottery > ~/backup-before-housie-$(date +%F).sql
-scp database/migrations/add_housie_module.sql mumadmin@$SERVER_IP:/tmp/   # from the PC
-sudo mysql diwali_lottery < /tmp/add_housie_module.sql && rm /tmp/add_housie_module.sql
+mysql -h <your-rds-endpoint> -u <master-user> -p
+```
+```sql
+CREATE USER 'lottery_migrate'@'%' IDENTIFIED BY 'GENERATE-A-LONG-RANDOM-PASSWORD';
+GRANT CREATE, ALTER, INDEX, REFERENCES, SELECT, INSERT ON diwali_lottery.* TO 'lottery_migrate'@'%';
 ```
 
-The `lottery` DB user already has SELECT/INSERT/UPDATE/DELETE on `diwali_lottery.*`, which covers the new tables. `bin/healthcheck.php` reports whether the Housie tables exist (informational; it never blocks a deploy). Housie LED screen: `https://lottery.myappstore.org.in/housie/live-display.php`.
+(Restrict `%` to the app server's private IP or VPC range if you prefer; the RDS security group already limits who can connect.) Then add it to `shared/.env` (step 6):
+
+```
+LOTTERY_DB_MIGRATE_USER=lottery_migrate
+LOTTERY_DB_MIGRATE_PASS=<that password>
+```
+
+If these are not set, `bin/migrate.php` uses the app user, which works only if that user may create tables. Take an RDS snapshot before the first deploy that adds a migration. Manual run / check on the server:
+
+```bash
+sudo -u deploy php /var/www/apps/lottery.myappstore.org.in/current/bin/migrate.php --status
+sudo -u deploy php /var/www/apps/lottery.myappstore.org.in/current/bin/migrate.php
+```
+
+The app user keeps SELECT/INSERT/UPDATE/DELETE on `diwali_lottery.*`, which covers new tables automatically. Housie LED screen: `https://lottery.myappstore.org.in/housie/live-display.php`.
 
 ## 6. Production `.env` (server)
 
